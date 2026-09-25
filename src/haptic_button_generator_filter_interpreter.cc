@@ -23,6 +23,8 @@ HapticButtonGeneratorFilterInterpreter::HapticButtonGeneratorFilterInterpreter(
       button_down_(false),
       dynamic_down_threshold_(0.0),
       dynamic_up_threshold_(0.0),
+      prev_sensitivity_(3),
+      sensitivity_reduced_(false),
       sensitivity_(prop_reg, "Haptic Button Sensitivity", 3),
       use_custom_thresholds_(prop_reg,
                              "Use Custom Haptic Button Force Thresholds",
@@ -61,6 +63,8 @@ HapticButtonGeneratorFilterInterpreter::HapticButtonGeneratorFilterInterpreter(
   up_haptic_intensities_[2] = 75;
   up_haptic_intensities_[3] = 75;
   up_haptic_intensities_[4] = 75;
+
+  sensitivity_.SetDelegate(this);
 }
 
 void HapticButtonGeneratorFilterInterpreter::Initialize(
@@ -123,6 +127,13 @@ void HapticButtonGeneratorFilterInterpreter::HandleHardwareState(
   force *= force_scale_.val_;
   force += force_translate_.val_;
 
+  // Check if we've recently reduced the sensitivity level to avoid accidental
+  // double clicks. Prevent button presses until the force dips below the new up
+  // threshold.
+  if (sensitivity_reduced_ && (button_down_ || force <= up_threshold)) {
+    sensitivity_reduced_ = false;
+  }
+
   // Set the button state
   bool prev_button_down = button_down_;
   if (button_down_) {
@@ -130,7 +141,8 @@ void HapticButtonGeneratorFilterInterpreter::HandleHardwareState(
       button_down_ = false;
     else
       hwstate.buttons_down = GESTURES_BUTTON_LEFT;
-  } else if (force > down_threshold && !active_gesture_) {
+  } else if (force > down_threshold && !active_gesture_ &&
+             !sensitivity_reduced_) {
     button_down_ = true;
     hwstate.buttons_down = GESTURES_BUTTON_LEFT;
   }
@@ -259,6 +271,15 @@ void HapticButtonGeneratorFilterInterpreter::ConsumeGesture(
 
   LogGestureProduce(name, out_gesture);
   ProduceGesture(out_gesture);
+}
+
+void HapticButtonGeneratorFilterInterpreter::IntWasWritten(IntProperty* prop) {
+  if (prop == &sensitivity_) {
+    if (sensitivity_.val_ < prev_sensitivity_ && !use_custom_thresholds_.val_) {
+      sensitivity_reduced_ = true;
+    }
+    prev_sensitivity_ = sensitivity_.val_;
+  }
 }
 
 }  // namespace gestures

@@ -507,4 +507,72 @@ TEST(HapticButtonGeneratorFilterInterpreterTest, HapticIntensityTest) {
   EXPECT_EQ(out->details.buttons.haptic_intensity, 0);
 }
 
+TEST(HapticButtonGeneratorFilterInterpreterTest, SensitivityChangeTest) {
+  HapticButtonGeneratorFilterInterpreterTestInterpreter* base_interpreter =
+      new HapticButtonGeneratorFilterInterpreterTestInterpreter;
+  HapticButtonGeneratorFilterInterpreter interpreter(
+      nullptr, base_interpreter, nullptr);
+  HardwareProperties hwprops = {
+    .right = 100, .bottom = 100,
+    .res_x = 10,
+    .res_y = 10,
+    .orientation_minimum = -1,
+    .orientation_maximum = 2,
+    .max_finger_cnt = 2, .max_touch_cnt = 5,
+    .supports_t5r2 = 0, .support_semi_mt = 0, .is_button_pad = 0,
+    .has_wheel = 0, .wheel_is_hi_res = 0,
+    .is_haptic_pad = 1,
+  };
+  TestInterpreterWrapper wrapper(&interpreter, &hwprops);
+
+  interpreter.enabled_.val_ = true;
+
+  // Set initial sensitivity to 5 (down = 160, up = 135).
+  interpreter.sensitivity_.val_ = 5;
+  interpreter.sensitivity_.HandleGesturesPropWritten();
+
+  FingerState fs[] = {
+    // TM, Tm, WM, Wm, pr, orient, x, y, id, flag
+    { 0, 0, 0, 0, 165, 0, 10, 1, 1, 0 },
+    { 0, 0, 0, 0, 132, 0, 10, 1, 1, 0 },
+
+    { 0, 0, 0, 0, 132, 0, 10, 1, 1, 0 },
+    { 0, 0, 0, 0, 140, 0, 10, 1, 1, 0 },
+    { 0, 0, 0, 0, 105, 0, 10, 1, 1, 0 },
+    { 0, 0, 0, 0, 135, 0, 10, 1, 1, 0 },
+    { 0, 0, 0, 0, 100, 0, 10, 1, 1, 0 },
+  };
+
+  stime_t timeout = NO_DEADLINE;
+
+  // Click and release at sensitivity 5, leaving force (132) below the old up
+  // threshold (135) but above sensitivity 3's down threshold (130).
+  HardwareState hs0 = make_hwstate(1.01, 0, 1, 1, &fs[0]);
+  wrapper.SyncInterpret(hs0, &timeout);
+  EXPECT_EQ(hs0.buttons_down, GESTURES_BUTTON_LEFT);
+
+  HardwareState hs1 = make_hwstate(1.02, 0, 1, 1, &fs[1]);
+  wrapper.SyncInterpret(hs1, &timeout);
+  EXPECT_EQ(hs1.buttons_down, 0);
+
+  // Reduce sensitivity to 3 (down = 130, up = 105).
+  interpreter.sensitivity_.val_ = 3;
+  interpreter.sensitivity_.HandleGesturesPropWritten();
+
+  // Expect button down to be suppressed until force drops to or below the new
+  // up threshold (105), after which normal clicking resumes.
+  std::pair<HardwareState, int> hs_after_change[] = {
+    std::make_pair(make_hwstate(2.01, 0, 1, 1, &fs[2]), 0),
+    std::make_pair(make_hwstate(2.02, 0, 1, 1, &fs[3]), 0),
+    std::make_pair(make_hwstate(2.03, 0, 1, 1, &fs[4]), 0),
+    std::make_pair(make_hwstate(2.04, 0, 1, 1, &fs[5]), GESTURES_BUTTON_LEFT),
+    std::make_pair(make_hwstate(2.05, 0, 1, 1, &fs[6]), 0),
+  };
+
+  for (size_t i = 0; i < arraysize(hs_after_change); i++) {
+    wrapper.SyncInterpret(hs_after_change[i].first, &timeout);
+    EXPECT_EQ(hs_after_change[i].first.buttons_down, hs_after_change[i].second);
+  }
+}
+
 }  // namespace gestures

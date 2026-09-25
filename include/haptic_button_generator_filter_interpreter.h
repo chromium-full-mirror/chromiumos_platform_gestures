@@ -19,7 +19,8 @@
 
 namespace gestures {
 
-class HapticButtonGeneratorFilterInterpreter : public FilterInterpreterWithTimer {
+class HapticButtonGeneratorFilterInterpreter :
+    public FilterInterpreterWithTimer, public PropertyDelegate {
   FRIEND_TEST(HapticButtonGeneratorFilterInterpreterTest, SimpleTest);
   FRIEND_TEST(HapticButtonGeneratorFilterInterpreterTest, NotHapticTest);
   FRIEND_TEST(HapticButtonGeneratorFilterInterpreterTest,
@@ -29,6 +30,8 @@ class HapticButtonGeneratorFilterInterpreter : public FilterInterpreterWithTimer
   FRIEND_TEST(HapticButtonGeneratorFilterInterpreterTest, DynamicThresholdTest);
   FRIEND_TEST(HapticButtonGeneratorFilterInterpreterTest, PalmTest);
   FRIEND_TEST(HapticButtonGeneratorFilterInterpreterTest, HapticIntensityTest);
+  FRIEND_TEST(HapticButtonGeneratorFilterInterpreterTest,
+              SensitivityChangeTest);
  public:
   // Takes ownership of |next|:
   explicit HapticButtonGeneratorFilterInterpreter(PropRegistry* prop_reg,
@@ -48,6 +51,7 @@ class HapticButtonGeneratorFilterInterpreter : public FilterInterpreterWithTimer
   void ConsumeGesture(const Gesture& gesture) override;
   void HandleHardwareState(HardwareState& hwstate);
   void UpdatePalmState(const HardwareState& hwstate);
+  void IntWasWritten(IntProperty* prop) override;
 
   static const size_t kMaxSensitivitySettings = 5;
 
@@ -79,6 +83,10 @@ class HapticButtonGeneratorFilterInterpreter : public FilterInterpreterWithTimer
   // allow easier double-clicking
   double dynamic_down_threshold_;
   double dynamic_up_threshold_;
+
+  // Tracking changes to the sensitivity property.
+  int prev_sensitivity_;
+  bool sensitivity_reduced_;
 
   IntProperty sensitivity_;  // [1..5]
 
