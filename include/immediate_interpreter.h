@@ -433,8 +433,8 @@ class ImmediateInterpreter : public Interpreter, public PropertyDelegate {
   // kGestureTypeFourFingerSwipe
   bool IsScrollOrSwipe(const GestureType gesture_type);
 
-  // Checks if a scroll or swipe has ended, and replaces current_gesture_type_
-  // with the appropriate finger lift gesture.
+  // Checks if a scroll, swipe, or pinch has ended, and replaces
+  // current_gesture_type_ with the appropriate finger lift gesture.
   void GenerateFingerLiftGesture();
 
   // Sorts the fingers referred to in finger_ids (whose details are in hwstate)

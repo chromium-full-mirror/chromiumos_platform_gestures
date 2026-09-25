@@ -1774,6 +1774,22 @@ bool ImmediateInterpreter::IsScrollOrSwipe(GestureType gesture_type) {
 }
 
 void ImmediateInterpreter::GenerateFingerLiftGesture() {
+  // We handle Pinch separately because there is no distinct "Lift" GestureType,
+  // instead we track the pinch_status_
+  if (prev_gesture_type_ == kGestureTypePinch &&
+      pinch_status_ == GESTURES_ZOOM_END) {
+    Gesture result(kGesturePinch, changed_time_, state_buffer_.Get(0).timestamp,
+                   1.0, GESTURES_ZOOM_END);
+    LogGestureProduce("ImmediateInterpreter::GenerateFingerLiftGesture",
+                      result);
+    ProduceGesture(result);
+    pinch_prev_time_ = state_buffer_.Get(0).timestamp;
+    pinch_prev_direction_ = 0;
+    if (current_gesture_type_ == kGestureTypePinch) {
+      current_gesture_type_ = kGestureTypeNull;
+    }
+  }
+
   if (!IsScrollOrSwipe(prev_gesture_type_) ||
       current_gesture_type_ == prev_gesture_type_) {
     return;
@@ -2749,7 +2765,6 @@ std::optional<Gesture> ImmediateInterpreter::FillResultGesture(
       }
       break;
     }
-    // kGestureTypeFling is handled by GenerateFingerLiftGesture.
     case kGestureTypeSwipe:
     case kGestureTypeFourFingerSwipe: {
       if (!three_finger_swipe_enable_.val_)
@@ -2802,19 +2817,13 @@ std::optional<Gesture> ImmediateInterpreter::FillResultGesture(
       }
       break;
     }
-    // Lift gestures (swipe lift, four finger swipe lift) are handled by
-    // GenerateFingerLiftGesture.
+    // Lift gestures (fling, swipe lift, four finger swipe lift, and pinch end)
+    // are handled by GenerateFingerLiftGesture.
     case kGestureTypePinch: {
-      if (pinch_status_ == GESTURES_ZOOM_START ||
-          (pinch_status_ == GESTURES_ZOOM_END &&
-           prev_gesture_type_ == kGestureTypePinch)) {
+      if (pinch_status_ == GESTURES_ZOOM_START) {
         result = Gesture(kGesturePinch, changed_time_, hwstate.timestamp, 1.0,
                          pinch_status_);
         pinch_prev_time_ = hwstate.timestamp;
-        if (pinch_status_ == GESTURES_ZOOM_END) {
-          current_gesture_type_ = kGestureTypeNull;
-          pinch_prev_direction_ = 0;
-        }
       } else if (pinch_status_ == GESTURES_ZOOM_UPDATE) {
         float current_dist_sq = TwoSpecificFingerDistanceSq(hwstate, fingers);
         if (current_dist_sq < 0) {

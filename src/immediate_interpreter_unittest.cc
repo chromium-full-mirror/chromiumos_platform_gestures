@@ -3421,6 +3421,67 @@ TEST(ImmediateInterpreterTest, FourFingerSwipeLiftAndButtonChangeOnSameSync) {
   EXPECT_EQ(kGestureTypeButtonsChange, gestures[1].type);
 }
 
+TEST(ImmediateInterpreterTest, PinchEndAndButtonChangeOnSameSync) {
+  ImmediateInterpreter ii(nullptr, nullptr);
+  HardwareProperties hwprops = {
+    .right = 1000,
+    .bottom = 1000,
+    .res_x = 50,
+    .res_y = 50,
+    .orientation_minimum = 0,
+    .orientation_maximum = 0,
+    .max_finger_cnt = 5,
+    .max_touch_cnt = 5,
+    .supports_t5r2 = false,
+    .support_semi_mt = false,
+    .is_button_pad = false,
+    .has_wheel = false,
+    .wheel_is_hi_res = false,
+    // On haptic touchpads, button_evaluation_timeout is 0, emitting the button
+    // down event immediately upon press. This ensures Pinch end and
+    // ButtonsChange occur in the same sync frame to test that Pinch end is not
+    // dropped.
+    .is_haptic_pad = true,
+  };
+  TestInterpreterWrapper wrapper(&ii, &hwprops);
+
+  // Frame 1: Fingers are added.
+  FingerState fingers_appear[] = {
+    {0, 0, 0, 0, 50, 0, 450, 400, 1, 0},
+    {0, 0, 0, 0, 50, 0, 480, 400, 2, 0},
+  };
+  HardwareState curr_frame =
+      make_hwstate(0.1, GESTURES_BUTTON_NONE, 2, 2, fingers_appear);
+  Gesture* gs = wrapper.SyncInterpret(curr_frame, nullptr);
+  EXPECT_EQ(nullptr, gs);
+
+  // Frame 2: Pinching begins.
+  FingerState pinching_fingers[] = {
+    {0, 0, 0, 0, 50, 0, 430, 400, 1, GESTURES_FINGER_TREND_DEC_X},
+    {0, 0, 0, 0, 50, 0, 500, 400, 2, GESTURES_FINGER_TREND_INC_X},
+  };
+  curr_frame = make_hwstate(0.2, GESTURES_BUTTON_NONE, 2, 2, pinching_fingers);
+  gs = wrapper.SyncInterpret(curr_frame, nullptr);
+  ASSERT_NE(nullptr, gs);
+  EXPECT_EQ(kGestureTypePinch, gs->type);
+  EXPECT_EQ(GESTURES_ZOOM_START, gs->details.pinch.zoom_state);
+
+  // Frame 3: Button pressed on haptic touchpad during pinch.
+  // Both Pinch end and ButtonsChange must be produced in this exact sync.
+  FingerState pinching_fingers_2[] = {
+    {0, 0, 0, 0, 50, 0, 410, 400, 1, GESTURES_FINGER_TREND_DEC_X},
+    {0, 0, 0, 0, 50, 0, 520, 400, 2, GESTURES_FINGER_TREND_INC_X},
+  };
+  curr_frame = make_hwstate(0.3, GESTURES_BUTTON_LEFT, 2, 2,
+                            pinching_fingers_2);
+  std::vector<Gesture> gestures =
+      wrapper.SyncInterpretMulti(curr_frame, nullptr);
+  ASSERT_EQ(2, gestures.size());
+  EXPECT_EQ(kGestureTypePinch, gestures[0].type);
+  EXPECT_EQ(GESTURES_ZOOM_END, gestures[0].details.pinch.zoom_state);
+  EXPECT_EQ(kGestureTypeButtonsChange, gestures[1].type);
+}
+
 
 struct BottomRightClickAreaParameters {
   bool enabled;
