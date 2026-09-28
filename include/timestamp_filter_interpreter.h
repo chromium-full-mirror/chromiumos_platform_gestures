@@ -24,6 +24,9 @@
 namespace gestures {
 
 class TimestampFilterInterpreter : public FilterInterpreter {
+  FRIEND_TEST(TimestampFilterInterpreterTest, SimpleTest);
+  FRIEND_TEST(TimestampFilterInterpreterTest, NoMscTimestampTest);
+  FRIEND_TEST(TimestampFilterInterpreterTest, MscTimestampResetTest);
   FRIEND_TEST(TimestampFilterInterpreterTest, FakeTimestampTest);
   FRIEND_TEST(TimestampFilterInterpreterTest, FakeTimestampJumpForwardTest);
   FRIEND_TEST(TimestampFilterInterpreterTest, FakeTimestampFallBackwardTest);
@@ -96,6 +99,8 @@ class TimestampFilterInterpreter : public FilterInterpreter {
 
   // Maximum skew_ since the last reset.
   stime_t max_skew_;
+
+  BoolProperty use_msc_timestamp_;
 
   // If we don't have a reliable timestamp, we use this as the timestamp delta.
   DoubleProperty fake_timestamp_delta_;

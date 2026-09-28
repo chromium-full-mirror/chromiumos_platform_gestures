@@ -20,6 +20,7 @@ TimestampFilterInterpreter::TimestampFilterInterpreter(
       fake_timestamp_max_divergence_(0.1),
       skew_(0.0),
       max_skew_(0.0),
+      use_msc_timestamp_(prop_reg, "Use Firmware Timestamp", false),
       fake_timestamp_delta_(prop_reg, "Fake Timestamp Delta", 0.0) {
   InitName();
 }
@@ -30,9 +31,9 @@ void TimestampFilterInterpreter::SyncInterpretImpl(
   LogHardwareStatePre(name, hwstate);
   auto debug_data = ActivityLog::TimestampHardwareStateDebug{};
 
-  if (fake_timestamp_delta_.val_ == 0.0)
+  if (use_msc_timestamp_.val_)
     ChangeTimestampDefault(hwstate, debug_data);
-  else
+  else if (fake_timestamp_delta_.val_ != 0.0)
     ChangeTimestampUsingFake(hwstate, debug_data);
 
   LogDebugData(debug_data);

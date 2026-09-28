@@ -47,6 +47,8 @@ TEST(TimestampFilterInterpreterTest, SimpleTest) {
   TimestampFilterInterpreter interpreter(nullptr, base_interpreter, nullptr);
   TestInterpreterWrapper wrapper(&interpreter);
 
+  interpreter.use_msc_timestamp_.val_ = true;
+
   HardwareState hs[] = {
     make_hwstate_times(1.000, 0.000),
     make_hwstate_times(1.010, 0.012),
@@ -68,11 +70,38 @@ TEST(TimestampFilterInterpreterTest, SimpleTest) {
   EXPECT_FLOAT_EQ(adjusted_timestamp, 2.002);
 }
 
+TEST(TimestampFilterInterpreterTest, FilterDisabledTest) {
+  TimestampFilterInterpreterTestInterpreter* base_interpreter =
+      new TimestampFilterInterpreterTestInterpreter;
+  TimestampFilterInterpreter interpreter(nullptr, base_interpreter, nullptr);
+  TestInterpreterWrapper wrapper(&interpreter);
+
+  HardwareState hs[] = {
+    make_hwstate_times(1.000, 0.000),
+    make_hwstate_times(1.010, 0.012),
+    make_hwstate_times(1.020, 0.018),
+    make_hwstate_times(1.030, 0.031),
+  };
+
+  stime_t expected_timestamps[] = { 1.000, 1.010, 1.020, 1.030 };
+
+  for (size_t i = 0; i < arraysize(hs); i++) {
+    wrapper.SyncInterpret(hs[i], nullptr);
+    EXPECT_EQ(hs[i].timestamp, expected_timestamps[i]);
+  }
+
+  stime_t callback_timestamp = 0.0;
+  wrapper.HandleTimer(2.0, &callback_timestamp);
+  EXPECT_FLOAT_EQ(callback_timestamp, 2.0);
+}
+
 TEST(TimestampFilterInterpreterTest, NoMscTimestampTest) {
   TimestampFilterInterpreterTestInterpreter* base_interpreter =
       new TimestampFilterInterpreterTestInterpreter;
   TimestampFilterInterpreter interpreter(nullptr, base_interpreter, nullptr);
   TestInterpreterWrapper wrapper(&interpreter);
+
+  interpreter.use_msc_timestamp_.val_ = true;
 
   HardwareState hs[] = {
     make_hwstate_times(1.000, 0.000),
@@ -98,6 +127,8 @@ TEST(TimestampFilterInterpreterTest, MscTimestampResetTest) {
       new TimestampFilterInterpreterTestInterpreter;
   TimestampFilterInterpreter interpreter(nullptr, base_interpreter, nullptr);
   TestInterpreterWrapper wrapper(&interpreter);
+
+  interpreter.use_msc_timestamp_.val_ = true;
 
   HardwareState hs[] = {
     make_hwstate_times(1.000, 0.000),
